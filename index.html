@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Household Expense Logger</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-sm">
+                    <i data-lucide="wallet" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-slate-900 text-base sm:text-lg leading-tight">Household Expense</h1>
+                    <p class="text-xs text-slate-500 hidden sm:block">Quick Logger & Sheet Sync</p>
+                </div>
+            </div>
+
+            <!-- Connection Status & Setup Button -->
+            <button id="openSetupBtn" type="button" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium border transition-all shadow-sm bg-white hover:bg-slate-50 border-slate-200 text-slate-700">
+                <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                <span id="statusText">Local Mode</span>
+                <i data-lucide="settings-2" class="w-4 h-4 text-slate-400"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-96 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+
+        <!-- Quick-Entry Form Card -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+            <div class="px-5 py-4 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-4 h-4 text-brand-600"></i>
+                    <h2 class="font-semibold text-slate-800 text-sm sm:text-base">Log New Transaction</h2>
+                </div>
+                <button type="button" id="resetNowBtn" class="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-brand-50 transition-colors">
+                    <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                    Set Now
+                </button>
+            </div>
+
+            <form id="expenseForm" class="p-5 sm:p-6 space-y-5">
+                
+                <!-- Row 1: Transaction Type Toggle & Amount (Hero Inputs) -->
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                    <!-- 5. Transaction (Debit/Credit) -->
+                    <div class="sm:col-span-5">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Transaction</label>
+                        <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-xl border border-slate-200/60">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="transaction" value="Debit" class="peer sr-only" checked>
+                                <div class="text-center py-2.5 text-sm font-semibold rounded-lg text-slate-600 peer-checked:bg-white peer-checked:text-rose-600 peer-checked:shadow-sm transition-all">
+                                    Debit (-)
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="transaction" value="Credit" class="peer sr-only">
+                                <div class="text-center py-2.5 text-sm font-semibold rounded-lg text-slate-600 peer-checked:bg-white peer-checked:text-emerald-600 peer-checked:shadow-sm transition-all">
+                                    Credit (+)
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 6. Amount -->
+                    <div class="sm:col-span-7">
+                        <label for="amount" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Amount (INR) <span class="text-rose-500">*</span></label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 font-semibold text-lg">₹</span>
+                            <input type="number" id="amount" name="amount" step="0.01" min="0" required placeholder="0.00"
+                                class="w-full pl-9 pr-4 py-2.5 text-lg font-bold text-slate-900 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Category & Description -->
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                    <!-- 3. Category -->
+                    <div class="sm:col-span-5">
+                        <label for="category" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Category <span class="text-rose-500">*</span></label>
+                        <div class="relative">
+                            <select id="category" name="category" required
+                                class="w-full appearance-none px-3.5 py-2.5 text-sm font-medium text-slate-800 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all pr-9">
+                                <option value="Food">Food</option>
+                                <option value="Groceries">Groceries</option>
+                                <option value="Home">Home</option>
+                                <option value="Household">Household</option>
+                                <option value="Travel">Travel</option>
+                                <option value="Bills">Bills</option>
+                                <option value="Utilities">Utilities</option>
+                                <option value="Rent">Rent</option>
+                                <option value="Shopping">Shopping</option>
+                                <option value="Medical">Medical</option>
+                                <option value="Cigarettes">Cigarettes</option>
+                                <option value="Alcohol">Alcohol</option>
+                                <option value="Friends">Friends</option>
+                                <option value="Wife">Wife</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Miscellaneous">Miscellaneous</option>
+                                <option value="Other">+ Other (Custom)...</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                        </div>
+                        <!-- Custom Category Input (Hidden unless "Other" selected) -->
+                        <div id="customCategoryWrapper" class="hidden mt-2">
+                            <input type="text" id="customCategory" placeholder="Enter custom category"
+                                class="w-full px-3.5 py-2 text-sm text-slate-800 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+                        </div>
+                    </div>
+
+                    <!-- 4. Description -->
+                    <div class="sm:col-span-7">
+                        <label for="description" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Description <span class="text-rose-500">*</span></label>
+                        <input type="text" id="description" name="description" required placeholder="e.g., Mandir, Dinner, Metro, Vegetables"
+                            class="w-full px-3.5 py-2.5 text-sm text-slate-800 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all">
+                    </div>
+                </div>
+
+                <!-- Row 3: Medium & Account -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- 7. Medium -->
+                    <div>
+                        <label for="medium" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Medium</label>
+                        <div class="relative">
+                            <select id="medium" name="medium"
+                                class="w-full appearance-none px-3.5 py-2.5 text-sm font-medium text-slate-800 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all pr-9">
+                                <option value="GPay">GPay</option>
+                                <option value="Credit Card">Credit Card</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Account Debit">Account Debit</option>
+                                <option value="Cash">Cash</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    <!-- 8. Account -->
+                    <div>
+                        <label for="account" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Account</label>
+                        <div class="relative">
+                            <select id="account" name="account"
+                                class="w-full appearance-none px-3.5 py-2.5 text-sm font-medium text-slate-800 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all pr-9">
+                                <option value="ICICI 1510">ICICI 1510</option>
+                                <option value="HDFC Rupay CC">HDFC Rupay CC</option>
+                                <option value="HDFC 7240">HDFC 7240</option>
+                                <option value="ICICI MasterCard CC">ICICI MasterCard CC</option>
+                                <option value="Cash">Cash</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 4: Date & Time (Columns 1 & 2 in Sheet) -->
+                <div class="grid grid-cols-2 gap-4 pt-1 border-t border-slate-100">
+                    <!-- 1. Date -->
+                    <div>
+                        <label for="dateInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Date</label>
+                        <input type="date" id="dateInput" name="dateInput" required
+                            class="w-full px-3.5 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all">
+                    </div>
+
+                    <!-- 2. Time -->
+                    <div>
+                        <label for="timeInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Time</label>
+                        <input type="time" id="timeInput" name="timeInput" required
+                            class="w-full px-3.5 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all">
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-2">
+                    <button type="submit" id="submitBtn"
+                        class="w-full py-3.5 px-5 bg-brand-600 hover:bg-brand-700 active:scale-[0.99] text-white font-semibold text-sm sm:text-base rounded-xl shadow-sm shadow-brand-600/20 flex items-center justify-center gap-2 transition-all">
+                        <i data-lucide="send" class="w-4 h-4"></i>
+                        <span id="submitBtnText">Log Expense</span>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Session Log Table Section -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+            <div class="px-5 py-4 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="font-semibold text-slate-800 text-sm sm:text-base flex items-center gap-2">
+                        <span>Session Entries</span>
+                        <span id="entryCountBadge" class="px-2 py-0.5 text-xs font-bold rounded-full bg-brand-100 text-brand-700">0</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Exact 8-column order matching your Google Sheet</p>
+                </div>
+
+                <!-- Export & Copy Controls -->
+                <div class="flex items-center gap-2">
+                    <button type="button" id="copyAllTsvBtn" title="Copy all rows as Tab-Separated Values to paste directly into Google Sheets"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+                        <i data-lucide="clipboard-copy" class="w-3.5 h-3.5 text-slate-500"></i>
+                        Copy for Sheets
+                    </button>
+                    <button type="button" id="downloadCsvBtn" title="Download entries as CSV file"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+                        <i data-lucide="download" class="w-3.5 h-3.5 text-slate-500"></i>
+                        CSV
+                    </button>
+                    <button type="button" id="clearLogBtn" title="Clear local history"
+                        class="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition-colors">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Responsive Table Wrapper -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-200 bg-slate-50/40 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                            <th class="py-3 px-4">Date</th>
+                            <th class="py-3 px-3">Time</th>
+                            <th class="py-3 px-3">Category</th>
+                            <th class="py-3 px-3">Description</th>
+                            <th class="py-3 px-3">Type</th>
+                            <th class="py-3 px-3 text-right">Amount</th>
+                            <th class="py-3 px-3">Medium</th>
+                            <th class="py-3 px-3">Account</th>
+                            <th class="py-3 px-4 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="entriesTableBody" class="divide-y divide-slate-100 text-sm">
+                        <!-- Rows injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="py-12 px-4 text-center">
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="receipt" class="w-6 h-6"></i>
+                </div>
+                <p class="text-sm font-medium text-slate-700">No expenses logged in this session yet</p>
+                <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Add an entry above to see it formatted for your sheet, or connect your Apps Script URL for automatic syncing.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Apps Script Setup Modal -->
+    <div id="setupModal" class="fixed inset-0 z-50 hidden">
+        <!-- Backdrop -->
+        <div id="setupBackdrop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"></div>
+
+        <!-- Modal Content -->
+        <div class="fixed inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="relative bg-white rounded-2xl shadow-xl border border-slate-200 max-w-2xl w-full overflow-hidden my-8">
+                    
+                    <!-- Modal Header -->
+                    <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                                <i data-lucide="sheet" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-slate-900 text-base">Connect to Google Sheets</h3>
+                                <p class="text-xs text-slate-500">Live backend sync via Google Apps Script</p>
+                            </div>
+                        </div>
+                        <button type="button" id="closeSetupBtn" class="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200/50 transition-colors">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+                        
+                        <!-- Step 1: Web App URL Input -->
+                        <div class="space-y-2">
+                            <label for="webhookUrlInput" class="block text-sm font-semibold text-slate-800">
+                                1. Apps Script Web App URL
+                            </label>
+                            <p class="text-xs text-slate-500">
+                                Paste your deployed <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">https://script.google.com/macros/s/.../exec</code> URL below. Leave blank to stay in Local Demo Mode.
+                            </p>
+                            <div class="flex flex-col sm:flex-row gap-2 pt-1">
+                                <input type="url" id="webhookUrlInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+                                    class="flex-1 px-3.5 py-2.5 text-sm text-slate-800 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+                                <button type="button" id="saveWebhookBtn"
+                                    class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm rounded-xl shadow-sm transition-colors shrink-0">
+                                    Save Connection
+                                </button>
+                            </div>
+                        </div>
+
+                        <hr class="border-slate-100">
+
+                        <!-- Step 2: Instructions & Pre-configured Code -->
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <h4 class="text-sm font-semibold text-slate-800">2. Backend Script (One-Time Setup)</h4>
+                                <button type="button" id="copyScriptBtn"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors">
+                                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                    Copy Code
+                                </button>
+                            </div>
+
+                            <ol class="text-xs text-slate-600 space-y-1.5 list-decimal list-inside bg-slate-50 p-3.5 rounded-xl border border-slate-200/70">
+                                <li>Open your <strong>Household Expense</strong> Google Sheet.</li>
+                                <li>Go to <strong>Extensions &rarr; Apps Script</strong>.</li>
+                                <li>Delete any existing code in <code class="text-slate-800 font-medium">Code.gs</code> and paste the script below.</li>
+                                <li>Click <strong>Deploy &rarr; New deployment</strong>.</li>
+                                <li>Select type <strong>Web app</strong>, set <em>Execute as</em> to <strong>Me</strong>, and <em>Who has access</em> to <strong>Anyone</strong>.</li>
+                                <li>Click <strong>Deploy</strong>, authorize permissions, and paste the Web App URL above.</li>
+                            </ol>
+
+                            <!-- Pre-configured Apps Script Code Block -->
+                            <div class="relative">
+<pre id="appsScriptCode" class="bg-slate-900 text-slate-100 text-xs p-4 rounded-xl overflow-x-auto font-mono leading-relaxed">function doPost(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    // Targets the first sheet tab (or change to ss.getSheetByName("Sheet1"))
+    var sheet = ss.getSheets()[0];
+    
+    var data = JSON.parse(e.postData.contents);
+    
+    // Appends row in exact column order:
+    // 1. Date | 2. Time | 3. Category | 4. Description | 5. Transaction | 6. Amount | 7. Medium | 8. Account
+    sheet.appendRow([
+      data.Date,
+      data.Time,
+      data.Category,
+      data.Description,
+      data.Transaction,
+      Number(data.Amount),
+      data.Medium,
+      data.Account
+    ]);
+    
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}</pre>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Inline Dialog for Clearing History (Replaces native confirm()) -->
+    <div id="confirmClearModal" class="fixed inset-0 z-50 hidden">
+        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs"></div>
+        <div class="fixed inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-sm w-full p-5 space-y-4">
+                <div class="flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-base">Clear Session Log?</h4>
+                        <p class="text-xs text-slate-500 mt-1">This removes entries from your browser's local log. Entries already synced to Google Sheets will not be affected.</p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="cancelClearBtn" class="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Cancel</button>
+                    <button type="button" id="confirmClearBtn" class="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors">Clear All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // Storage Keys
+        const STORAGE_ENTRIES_KEY = 'household_expense_entries_v1';
+        const STORAGE_WEBHOOK_KEY = 'household_expense_webhook_v1';
+
+        // Application State
+        let entries = [];
+        let webhookUrl = '';
+
+        // DOM Elements
+        const form = document.getElementById('expenseForm');
+        const dateInput = document.getElementById('dateInput');
+        const timeInput = document.getElementById('timeInput');
+        const categorySelect = document.getElementById('category');
+        const customCategoryWrapper = document.getElementById('customCategoryWrapper');
+        const customCategoryInput = document.getElementById('customCategory');
+        const descriptionInput = document.getElementById('description');
+        const amountInput = document.getElementById('amount');
+        const mediumSelect = document.getElementById('medium');
+        const accountSelect = document.getElementById('account');
+        const submitBtn = document.getElementById('submitBtn');
+        const submitBtnText = document.getElementById('submitBtnText');
+
+        const entriesTableBody = document.getElementById('entriesTableBody');
+        const emptyState = document.getElementById('emptyState');
+        const entryCountBadge = document.getElementById('entryCountBadge');
+
+        const setupModal = document.getElementById('setupModal');
+        const webhookUrlInput = document.getElementById('webhookUrlInput');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const confirmClearModal = document.getElementById('confirmClearModal');
+
+        /**
+         * Initialize application on DOM load
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadState();
+            setCurrentDateTime();
+            renderEntries();
+            updateConnectionStatus();
+            setupSmartDefaults();
+        });
+
+        /**
+         * Load persisted entries and webhook URL from localStorage
+         */
+        function loadState() {
+            try {
+                const savedEntries = localStorage.getItem(STORAGE_ENTRIES_KEY);
+                if (savedEntries) {
+                    entries = JSON.parse(savedEntries);
+                }
+                const savedUrl = localStorage.getItem(STORAGE_WEBHOOK_KEY);
+                if (savedUrl) {
+                    webhookUrl = savedUrl;
+                    webhookUrlInput.value = savedUrl;
+                }
+            } catch (e) {
+                console.error('Error loading state from localStorage:', e);
+            }
+        }
+
+        /**
+         * Save entries array to localStorage
+         */
+        function saveEntries() {
+            try {
+                localStorage.setItem(STORAGE_ENTRIES_KEY, JSON.stringify(entries));
+            } catch (e) {
+                console.error('Error saving entries:', e);
+            }
+        }
+
+        /**
+         * Set Date & Time inputs to current local date/time
+         */
+        function setCurrentDateTime() {
+            const now = new Date();
+            
+            // YYYY-MM-DD for HTML date input
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            dateInput.value = `${year}-${month}-${day}`;
+
+            // HH:MM for HTML time input
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            timeInput.value = `${hours}:${minutes}`;
+        }
+
+        /**
+         * Format YYYY-MM-DD into D/M/YYYY (exact Google Sheet format)
+         */
+        function formatSheetDate(isoDateStr) {
+            if (!isoDateStr) return '';
+            const parts = isoDateStr.split('-');
+            if (parts.length !== 3) return isoDateStr;
+            const year = parts[0];
+            const month = parseInt(parts[1], 10);
+            const day = parseInt(parts[2], 10);
+            return `${day}/${month}/${year}`;
+        }
+
+        /**
+         * Format 24-hour HH:MM into h:mm am/pm (exact Google Sheet format)
+         */
+        function formatSheetTime(time24Str) {
+            if (!time24Str) return '';
+            const [hourStr, minuteStr] = time24Str.split(':');
+            let hours = parseInt(hourStr, 10);
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // 0 becomes 12
+            return `${hours}:${minuteStr} ${ampm}`;
+        }
+
+        /**
+         * Smart UX helpers: toggle custom category & auto-pair Medium/Account
+         */
+        function setupSmartDefaults() {
+            categorySelect.addEventListener('change', () => {
+                if (categorySelect.value === 'Other') {
+                    customCategoryWrapper.classList.remove('hidden');
+                    customCategoryInput.required = true;
+                    customCategoryInput.focus();
+                } else {
+                    customCategoryWrapper.classList.add('hidden');
+                    customCategoryInput.required = false;
+                }
+            });
+
+            // Convenience pairing when switching Medium to Cash or Credit Card
+            mediumSelect.addEventListener('change', () => {
+                if (mediumSelect.value === 'Cash') {
+                    accountSelect.value = 'Cash';
+                } else if (mediumSelect.value === 'Credit Card' && !accountSelect.value.includes('CC')) {
+                    accountSelect.value = 'HDFC Rupay CC';
+                } else if (mediumSelect.value === 'GPay' && accountSelect.value === 'Cash') {
+                    accountSelect.value = 'ICICI 1510';
+                }
+            });
+        }
+
+        /**
+         * Update header indicator & submit button label based on Webhook URL presence
+         */
+        function updateConnectionStatus() {
+            if (webhookUrl && webhookUrl.trim().startsWith('http')) {
+                statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse';
+                statusText.textContent = 'Sheet Connected';
+                submitBtnText.textContent = 'Save to Google Sheet';
+            } else {
+                statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+                statusText.textContent = 'Local Mode';
+                submitBtnText.textContent = 'Log Expense (Local)';
+            }
+        }
+
+        /**
+         * Show non-blocking toast notification
+         */
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const styles = {
+                success: 'bg-slate-900 text-white border-slate-800',
+                error: 'bg-rose-600 text-white border-rose-700',
+                info: 'bg-brand-600 text-white border-brand-700'
+            };
+
+            const iconName = type === 'error' ? 'alert-circle' : (type === 'info' ? 'info' : 'check-circle-2');
+
+            toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg border text-xs sm:text-sm font-medium transition-all duration-300 transform translate-y-2 opacity-0 ${styles[type] || styles.success}`;
+            toast.innerHTML = `
+                <i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons({ root: toast });
+
+            // Trigger entrance animation
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            // Auto dismiss
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        /**
+         * Copy text to clipboard using document.execCommand('copy') for reliable iFrame support
+         */
+        function copyToClipboard(text, successMsg) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast(successMsg, 'success');
+            } catch (err) {
+                showToast('Failed to copy to clipboard', 'error');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        /**
+         * Handle Form Submission
+         */
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const rawCategory = categorySelect.value === 'Other'
+                ? customCategoryInput.value.trim()
+                : categorySelect.value;
+
+            if (!rawCategory) {
+                showToast('Please enter a category name', 'error');
+                return;
+            }
+
+            const transactionType = form.querySelector('input[name="transaction"]:checked').value;
+            const amountVal = parseFloat(amountInput.value);
+
+            if (isNaN(amountVal) || amountVal <= 0) {
+                showToast('Please enter a valid amount', 'error');
+                return;
+            }
+
+            // Construct payload matching the exact 8-column order of "Household Expense"
+            const newEntry = {
+                id: Date.now().toString(),
+                Date: formatSheetDate(dateInput.value),
+                Time: formatSheetTime(timeInput.value),
+                Category: rawCategory,
+                Description: descriptionInput.value.trim(),
+                Transaction: transactionType,
+                Amount: amountVal,
+                Medium: mediumSelect.value,
+                Account: accountSelect.value,
+                synced: false
+            };
+
+            // Disable submit button while processing
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            try {
+                if (webhookUrl && webhookUrl.trim().startsWith('http')) {
+                    // POST to Google Apps Script Web App
+                    // Using text/plain avoids CORS preflight OPTIONS requests on Google Apps Script
+                    await fetch(webhookUrl.trim(), {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: {
+                            'Content-Type': 'text/plain;charset=utf-8',
+                        },
+                        body: JSON.stringify(newEntry)
+                    });
+                    newEntry.synced = true;
+                    showToast(`Synced ₹${amountVal.toLocaleString('en-IN')} (${newEntry.Category}) to Google Sheet!`, 'success');
+                } else {
+                    showToast(`Logged ₹${amountVal.toLocaleString('en-IN')} locally. Connect Sheet to auto-sync.`, 'info');
+                }
+
+                // Prepend to session log and persist
+                entries.unshift(newEntry);
+                saveEntries();
+                renderEntries();
+
+                // Reset form inputs for quick next entry (keeping date/time/medium/account convenient)
+                amountInput.value = '';
+                descriptionInput.value = '';
+                if (categorySelect.value === 'Other') {
+                    categorySelect.value = 'Food';
+                    customCategoryWrapper.classList.add('hidden');
+                    customCategoryInput.value = '';
+                }
+                setCurrentDateTime();
+                amountInput.focus();
+
+            } catch (err) {
+                console.error('Submission error:', err);
+                // Still save locally so user never loses their entry
+                entries.unshift(newEntry);
+                saveEntries();
+                renderEntries();
+                showToast('Saved locally, but could not reach Google Sheet URL.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        });
+
+        /**
+         * Render Session Log Table
+         */
+        function renderEntries() {
+            entryCountBadge.textContent = entries.length;
+
+            if (entries.length === 0) {
+                entriesTableBody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            entriesTableBody.innerHTML = entries.map((entry) => {
+                const isCredit = entry.Transaction === 'Credit';
+                const amountFormatted = `₹${Number(entry.Amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+                return `
+                    <tr class="hover:bg-slate-50/90 transition-colors group">
+                        <td class="py-3 px-4 whitespace-nowrap text-xs font-medium text-slate-700">
+                            <div class="flex items-center gap-1.5">
+                                <span title="${entry.synced ? 'Synced to Google Sheet' : 'Saved locally only'}"
+                                      class="w-1.5 h-1.5 rounded-full ${entry.synced ? 'bg-emerald-500' : 'bg-amber-400'}"></span>
+                                ${escapeHtml(entry.Date)}
+                            </div>
+                        </td>
+                        <td class="py-3 px-3 whitespace-nowrap text-xs text-slate-500">${escapeHtml(entry.Time)}</td>
+                        <td class="py-3 px-3 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700">
+                                ${escapeHtml(entry.Category)}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3 text-xs text-slate-800 font-medium max-w-[180px] truncate" title="${escapeHtml(entry.Description)}">
+                            ${escapeHtml(entry.Description)}
+                        </td>
+                        <td class="py-3 px-3 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${isCredit ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
+                                ${escapeHtml(entry.Transaction)}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3 whitespace-nowrap text-right text-xs font-bold ${isCredit ? 'text-emerald-600' : 'text-slate-900'}">
+                            ${isCredit ? '+' : ''}${amountFormatted}
+                        </td>
+                        <td class="py-3 px-3 whitespace-nowrap text-xs text-slate-600">${escapeHtml(entry.Medium)}</td>
+                        <td class="py-3 px-3 whitespace-nowrap text-xs text-slate-600">${escapeHtml(entry.Account)}</td>
+                        <td class="py-3 px-4 whitespace-nowrap text-right">
+                            <button type="button" onclick="copySingleRow('${entry.id}')" title="Copy row as TSV for Google Sheets"
+                                class="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button type="button" onclick="deleteEntry('${entry.id}')" title="Remove from session log"
+                                class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            lucide.createIcons({ root: entriesTableBody });
+        }
+
+        /**
+         * Convert a single entry object into a Tab-Separated row matching the 8 columns
+         */
+        function entryToTsvRow(entry) {
+            return [
+                entry.Date,
+                entry.Time,
+                entry.Category,
+                entry.Description,
+                entry.Transaction,
+                entry.Amount,
+                entry.Medium,
+                entry.Account
+            ].join('\t');
+        }
+
+        /**
+         * Copy a single row in TSV format so user can paste directly into a Google Sheet cell
+         */
+        window.copySingleRow = function(id) {
+            const entry = entries.find(item => item.id === id);
+            if (!entry) return;
+            copyToClipboard(entryToTsvRow(entry), 'Row copied! Paste directly into Google Sheets.');
+        };
+
+        /**
+         * Delete single entry from session log
+         */
+        window.deleteEntry = function(id) {
+            entries = entries.filter(item => item.id !== id);
+            saveEntries();
+            renderEntries();
+        };
+
+        /**
+         * Copy all session rows as TSV (chronological order oldest-to-newest for pasting at bottom of sheet)
+         */
+        document.getElementById('copyAllTsvBtn').addEventListener('click', () => {
+            if (entries.length === 0) {
+                showToast('No entries to copy yet', 'info');
+                return;
+            }
+            const chronological = [...entries].reverse();
+            const tsvContent = chronological.map(entryToTsvRow).join('\n');
+            copyToClipboard(tsvContent, `Copied ${entries.length} row(s) for Google Sheets!`);
+        });
+
+        /**
+         * Download session entries as CSV file with exact column headers
+         */
+        document.getElementById('downloadCsvBtn').addEventListener('click', () => {
+            if (entries.length === 0) {
+                showToast('No entries to download yet', 'info');
+                return;
+            }
+
+            const headers = ['Date', 'Time', 'Category', 'Description', 'Transaction', 'Amount', 'Medium', 'Account'];
+            const chronological = [...entries].reverse();
+
+            const escapeCsv = (val) => {
+                const str = String(val ?? '');
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
+            const csvRows = [
+                headers.join(','),
+                ...chronological.map(e => [
+                    e.Date, e.Time, e.Category, e.Description, e.Transaction, e.Amount, e.Medium, e.Account
+                ].map(escapeCsv).join(','))
+            ];
+
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const todayStr = new Date().toISOString().slice(0, 10);
+            link.href = url;
+            link.setAttribute('download', `household_expenses_${todayStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showToast('Downloaded CSV file', 'success');
+        });
+
+        /**
+         * Event Listeners for Buttons & Modals
+         */
+        document.getElementById('resetNowBtn').addEventListener('click', () => {
+            setCurrentDateTime();
+            showToast('Updated to current date & time', 'info');
+        });
+
+        // Setup Modal controls
+        document.getElementById('openSetupBtn').addEventListener('click', () => {
+            setupModal.classList.remove('hidden');
+        });
+
+        document.getElementById('closeSetupBtn').addEventListener('click', () => {
+            setupModal.classList.add('hidden');
+        });
+
+        document.getElementById('setupBackdrop').addEventListener('click', () => {
+            setupModal.classList.add('hidden');
+        });
+
+        document.getElementById('saveWebhookBtn').addEventListener('click', () => {
+            const val = webhookUrlInput.value.trim();
+            if (val && !val.startsWith('https://script.google.com/')) {
+                showToast('Please enter a valid Google Apps Script Web App URL', 'error');
+                return;
+            }
+            webhookUrl = val;
+            localStorage.setItem(STORAGE_WEBHOOK_KEY, webhookUrl);
+            updateConnectionStatus();
+            setupModal.classList.add('hidden');
+            showToast(webhookUrl ? 'Connected to Google Sheet backend!' : 'Switched to Local Demo Mode', 'success');
+        });
+
+        document.getElementById('copyScriptBtn').addEventListener('click', () => {
+            const codeText = document.getElementById('appsScriptCode').textContent;
+            copyToClipboard(codeText, 'Apps Script code copied to clipboard!');
+        });
+
+        // Clear History Confirmation Modal controls
+        document.getElementById('clearLogBtn').addEventListener('click', () => {
+            if (entries.length === 0) return;
+            confirmClearModal.classList.remove('hidden');
+        });
+
+        document.getElementById('cancelClearBtn').addEventListener('click', () => {
+            confirmClearModal.classList.add('hidden');
+        });
+
+        document.getElementById('confirmClearBtn').addEventListener('click', () => {
+            entries = [];
+            saveEntries();
+            renderEntries();
+            confirmClearModal.classList.add('hidden');
+            showToast('Local session log cleared', 'info');
+        });
+
+        /**
+         * Basic HTML escaping helper
+         */
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
